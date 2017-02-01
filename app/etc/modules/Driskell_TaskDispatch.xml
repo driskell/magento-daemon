@@ -1,0 +1,16 @@
+<?xml version="1.0"?>
+<!--
+/**
+ * @copyright See LICENCE.md
+ * @package   Driskell_TaskDispatch
+ * @author    Jason Woods <devel@jasonwoods.me.uk>
+ */
+-->
+<config>
+    <modules>
+        <Driskell_TaskDispatch>
+            <active>true</active>
+            <codePool>community</codePool>
+        </Driskell_TaskDispatch>
+    </modules>
+</config>

@@ -1,0 +1,16 @@
+{
+    "name": "driskell/magento-task-dispatch",
+    "type": "magento-module",
+    "license": "Apache-2.0",
+    "description": "A persistent Magento service for running cron tasks",
+    "authors":[
+        {
+            "name": "Jason Woods",
+            "email": "devel@jasonwoods.me.uk"
+        }
+    ],
+    "homepage":"https://github.com/driskell/magento-task-dispatch",
+    "require": {
+        "magento-hackathon/magento-composer-installer": "*"
+    }
+}

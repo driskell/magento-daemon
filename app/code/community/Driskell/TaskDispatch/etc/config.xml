@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+/**
+ * @copyright See LICENCE.md
+ * @package   Driskell_TaskDispatch
+ * @author    Jason Woods <devel@jasonwoods.me.uk>
+ */
+-->
+<config>
+    <modules>
+        <Driskell_TaskDispatch>
+            <version>1.0.0</version>
+        </Driskell_TaskDispatch>
+    </modules>
+    <global>
+        <models>
+            <driskell_taskdispatch>
+                <class>Driskell_TaskDispatch_Model</class>
+            </driskell_taskdispatch>
+        </models>
+        <helpers>
+            <driskell_taskdispatch>
+                <class>Driskell_TaskDispatch_Helper</class>
+            </driskell_taskdispatch>
+        </helpers>
+    </global>
+</config>
