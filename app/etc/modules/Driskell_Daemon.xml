@@ -2,15 +2,15 @@
 <!--
 /**
  * @copyright See LICENCE.md
- * @package   Driskell_TaskDispatch
+ * @package   Driskell_Daemon
  * @author    Jason Woods <devel@jasonwoods.me.uk>
  */
 -->
 <config>
     <modules>
-        <Driskell_TaskDispatch>
+        <Driskell_Daemon>
             <active>true</active>
             <codePool>community</codePool>
-        </Driskell_TaskDispatch>
+        </Driskell_Daemon>
     </modules>
 </config>

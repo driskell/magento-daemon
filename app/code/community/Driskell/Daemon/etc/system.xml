@@ -1,0 +1,48 @@
+<?xml version="1.0"?>
+<!--
+/**
+ * @copyright See LICENCE.md
+ * @package   Driskell_Daemon
+ * @author    Jason Woods <devel@jasonwoods.me.uk>
+ */
+-->
+<config>
+    <tabs>
+        <driskell translate="label">
+            <label>Driskell</label>
+            <sort_order>101</sort_order>
+        </driskell>
+    </tabs>
+    <sections>
+        <driskell_daemon translate="label">
+            <label>Daemon</label>
+            <tab>driskell</tab>
+            <sort_order>100</sort_order>
+            <show_in_default>1</show_in_default>
+            <show_in_website>1</show_in_website>
+            <show_in_store>1</show_in_store>
+            <groups>
+                <general translate="label">
+                    <label>General</label>
+                    <sort_order>10</sort_order>
+                    <show_in_default>1</show_in_default>
+                    <show_in_website>1</show_in_website>
+                    <show_in_store>1</show_in_store>
+                    <expanded>1</expanded>
+                    <fields>
+                        <parallel_jobs translate="label">
+                            <label>Jobs to run in parallel</label>
+                            <frontend_type>multiselect</frontend_type>
+                            <source_model>driskell_daemon/system_config_source_jobs</source_model>
+                            <sort_order>20</sort_order>
+                            <show_in_default>1</show_in_default>
+                            <show_in_website>1</show_in_website>
+                            <show_in_store>1</show_in_store>
+                            <comment>(Service reload required.) Tasks are normally run in serial in the same way the Magento cron would do, with only the 'always' schedules run serially in another parallel process. By selecting a job code here, it will also be run in parallel in its own independent process. Useful for long running jobs that would otherwise slow down the recurrence of other jobs if run serially.</comment>
+                        </parallel_jobs>
+                    </fields>
+                </general>
+            </groups>
+        </driskell_daemon>
+    </sections>
+</config>
