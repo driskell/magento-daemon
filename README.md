@@ -1,5 +1,7 @@
 # Daemon for Magento
 
+**NOTE: This project is currently experimental and not recommended for Production usage.**
+
 Observable job processing for Magento 1 that replaces Magento cron.
 
 ## Overview
