@@ -537,7 +537,7 @@ class Driskell_Daemon_Model_Dispatcher extends Mage_Cron_Model_Observer
         $this->setScheduleCliTitle($schedule, $jobConfig, $jobType);
 
         $callback = $this->prepareJob($schedule, $jobConfig, $isAlways);
-        if ($callback === false) {
+        if (!$callback) {
             return $this;
         }
 
