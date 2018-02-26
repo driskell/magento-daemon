@@ -16,7 +16,19 @@ Daemon also provides the ability to mark certain jobs as parallel jobs, that wil
 
 The recommended installation method is to use composer. Alternatively, you can just copy the files into your Magento installation as you would any other extension.
 
-Magento cron should then be disabled and one of the service wrappers from inside the `Services` folder installed and configured. There are service wrappers provided for SysVInit (the `/etc/init.d` folder) and also SystemD, with documentation provided alongside the wrapper.
+You should then remove Magento's default cron from your crontab and install one of the service wrappers from inside the `services` folder. There are wrappers provided for SysVInit (the `/etc/init.d` folder) and also SystemD, with documentation alongside them.
+
+Add the following to your `composer.json` and then run `composer require driskell/magento-daemon`.
+
+```json
+    "repositories": [
+        ...
+        {
+            "type": "vcs",
+            "url": "https://github.com/driskell/magento-daemon"
+        }
+    ]
+```
 
 ## Configuration
 
@@ -25,6 +37,10 @@ The following configuration options are currently available in System > Configur
 Option | Description
 --- | ---
 Jobs to run in parallel | Any jobs selected here will not be run in serial with other jobs and have their own containing process. This prevents them from blocking other potentially critical jobs from being held in a queue.
+
+## Temporarily Disabling
+
+If you encounter any issues and need to revert to the default cron, all you need to do is stop the service and then start running the Magento cron again.
 
 ## Monitoring
 
