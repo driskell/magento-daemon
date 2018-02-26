@@ -21,6 +21,13 @@ class Driskell_Daemon_Model_Dispatcher extends Mage_Cron_Model_Observer
     private $processManager;
 
     /**
+     * Temp data directory for daemon to save logs etc. to
+     *
+     * @var string
+     */
+    private $varDir;
+
+    /**
      * List of currently active parallel jobs
      *
      * @var array
@@ -34,6 +41,7 @@ class Driskell_Daemon_Model_Dispatcher extends Mage_Cron_Model_Observer
     {
         $this->config = Mage::getModel('driskell_daemon/config');
         $this->processManager = Mage::getSingleton('driskell_daemon/processmanager');
+        $this->varDir = Mage::app()->getConfig()->getVarDir('daemon');
     }
 
     /**
@@ -49,13 +57,20 @@ class Driskell_Daemon_Model_Dispatcher extends Mage_Cron_Model_Observer
         // Make ourself recognisable in the process list
         $this->processManager->setProcessTitle('driskell-daemon [dispatcher]');
 
+        // Setup data directory
+        if (!file_exists($this->varDir)) {
+            mkdir($this->varDir, 0777, true);
+        }
+
+        $this->cleanBlackBox();
+
         // Prevent collection caching so we can reload the schedule reliably
         Mage::app()->getCacheInstance()->banUse('collections');
 
         $this->processManager->signalSleep($this->timeUntilNextRun());
         while (!$this->processManager->wasInterrupted()) {
             // Start children for always and default (it'll skip if already running)
-            $this->forkChildProcess('always');
+            $this->forkChildProcess('always', array($this, 'alwaysProcessCompleted'));
             $this->forkChildProcess('default', array($this, 'defaultProcessCompleted'));
 
             // Start parallel jobs
@@ -69,6 +84,19 @@ class Driskell_Daemon_Model_Dispatcher extends Mage_Cron_Model_Observer
     }
 
     /**
+     * Callback when the always process completes
+     *
+     * @param string $name
+     * @param int $pid
+     * @param int $status
+     * @return void
+     */
+    public function alwaysProcessCompleted($name, $pid, $status)
+    {
+        $this->batchedProcessCompleted('always', $name, $pid, $status);
+    }
+
+    /**
      * Callback when the default process completes
      *
      * @param string $name
@@ -78,6 +106,21 @@ class Driskell_Daemon_Model_Dispatcher extends Mage_Cron_Model_Observer
      */
     public function defaultProcessCompleted($name, $pid, $status)
     {
+        $this->batchedProcessCompleted('default', $name, $pid, $status);
+    }
+
+    /**
+     * Callback when a batched process completes
+     * (Called via defaultProcessCompleted and alwaysProcessCompleted)
+     *
+     * @param string $jobType
+     * @param string $name
+     * @param int $pid
+     * @param int $status
+     * @return void
+     */
+    private function batchedProcessCompleted($jobType, $name, $pid, $status)
+    {
         $exitCode = pcntl_wexitstatus($status);
         if (!pcntl_wifsignaled($status) && $exitCode == 0) {
             // Successful, all OK
@@ -85,12 +128,12 @@ class Driskell_Daemon_Model_Dispatcher extends Mage_Cron_Model_Observer
         }
 
         // An error occurred, pull up the last run job and flag it as failed
-        $scheduleId = $this->config->getActiveDefaultJob();
+        $scheduleId = $this->config->getActiveJob($jobType);
         if (!$scheduleId) {
             return;
         }
 
-        $this->config->clearActiveDefaultJob();
+        $this->config->clearActiveJob($jobType);
 
         $schedule = Mage::getModel('cron/schedule')->load($scheduleId);
         if (!$schedule) {
@@ -100,6 +143,9 @@ class Driskell_Daemon_Model_Dispatcher extends Mage_Cron_Model_Observer
         $schedule->setMessages(
             Mage::helper('cron')->__('Job failed with exit code: %d', $exitCode)
         );
+
+        // Collect any recorded logs into the given schedule messages
+        $this->processBlackBox($schedule, $pid);
 
         $schedule
             ->setStatus(Mage_Cron_Model_Schedule::STATUS_ERROR)
@@ -174,6 +220,7 @@ class Driskell_Daemon_Model_Dispatcher extends Mage_Cron_Model_Observer
         }
 
         $this->setScheduleCliTitle($schedule, $jobConfig);
+        $this->setupBlackBox();
         call_user_func_array($callback, $arguments);
     }
 
@@ -323,6 +370,9 @@ class Driskell_Daemon_Model_Dispatcher extends Mage_Cron_Model_Observer
             );
         }
 
+        // Collect any recorded logs into the given schedule messages
+        $this->processBlackBox($schedule, $pid);
+
         $schedule
             ->setStatus($errorStatus)
             ->setFinishedAt(strftime('%Y-%m-%d %H:%M:%S', time()))
@@ -405,6 +455,74 @@ class Driskell_Daemon_Model_Dispatcher extends Mage_Cron_Model_Observer
     }
 
     /**
+     * Cleanup orphaned blackboxes
+     *
+     * @return void
+     */
+    private function cleanBlackBox()
+    {
+        $blackBoxDir = opendir($this->varDir);
+        while (true) {
+            $fileName = readdir($blackBoxDir);
+            if ($fileName === false) {
+                break;
+            }
+            if ($filename == '.' || $filename == '..') {
+                continue;
+            }
+            if (preg_match('/^blackbox-[0-9]*\\.log$/i', $filename)) {
+                unlink($this->varDir . DS . $filename);
+            }
+        }
+    }
+
+    /**
+     * Initialise logging of errors
+     * Allows us to track warning out and even fatal errors from the
+     * contents of this file, which will be picked up by the dispatcher
+     * after we exit
+     *
+     * @return void
+     */
+    private function setupBlackBox()
+    {
+        $blackBox = $this->varDir . DS . 'blackbox-' . getmypid() . '.log';
+        unlink($blackBox);
+        ini_set('display_errors', 1);
+        ini_set('error_log', $blackBox);
+    }
+
+    /**
+     * Record messages from a black box to the given schedule
+     *
+     * @param Mage_Cron_Model_Schedule $schedule
+     * @param int $pid
+     * @return void
+     */
+    private function processBlackBox(Mage_Cron_Model_Schedule $schedule, $pid = 0)
+    {
+        if ($pid == 0) {
+            $pid = getmypid();
+        }
+
+        $blackBox = $this->varDir . DS . 'blackbox-' . $pid . '.log';
+        if (!file_exists($blackBox)) {
+            return;
+        }
+        if (filesize($blackBox) == 0) {
+            unlink($blackBox);
+            return;
+        }
+
+        $messages = file_get_contents($blackBox);
+        unlink($blackBox);
+        if ($schedule->getMessages()) {
+            $messages = $schedule->getMessages() . PHP_EOL . PHP_EOL . $messages;
+        }
+        $schedule->setMessages($messages);
+    }
+
+    /**
      * Override default process job function so we can store last ran job
      * and flag failure of correct one in the dispatcher if a failure occurs
      *
@@ -415,14 +533,16 @@ class Driskell_Daemon_Model_Dispatcher extends Mage_Cron_Model_Observer
      */
     protected function _processJob($schedule, $jobConfig, $isAlways = false)
     {
-        $this->setScheduleCliTitle($schedule, $jobConfig, $isAlways ? 'always' : 'default');
+        $jobType = $isAlways ? 'always' : 'default';
+        $this->setScheduleCliTitle($schedule, $jobConfig, $jobType);
 
         $callback = $this->prepareJob($schedule, $jobConfig, $isAlways);
         if ($callback === false) {
             return $this;
         }
 
-        $this->config->setActiveDefaultJob($schedule->setId());
+        $this->config->setActiveJob($jobType, $schedule->getId());
+        $this->setupBlackBox();
         $errorStatus = Mage_Cron_Model_Schedule::STATUS_ERROR;
         try {
             call_user_func($callback, $schedule);
@@ -430,7 +550,8 @@ class Driskell_Daemon_Model_Dispatcher extends Mage_Cron_Model_Observer
         } catch (Exception $e) {
             $schedule->setMessages($e->__toString());
         }
-        $this->config->clearActiveDefaultJob();
+        $this->processBlackBox($schedule);
+        $this->config->clearActiveJob($jobType);
 
         $schedule
             ->setStatus($errorStatus)

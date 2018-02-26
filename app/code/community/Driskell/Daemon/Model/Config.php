@@ -14,7 +14,7 @@ class Driskell_Daemon_Model_Config
     // So we need a persistent way to track what job the forked default runner is
     // running at any one time so that if it fails we can flag the correct job
     // as failed
-    const XML_PATH_ACTIVE_DEFAULT_JOB = 'driskell_daemon/active_default_job';
+    const XML_PATH_PREFIX_ACTIVE_JOB = 'driskell_daemon/active_job/';
 
     const XML_PATH_PARALLEL_JOBS = 'driskell_daemon/general/parallel_jobs';
 
@@ -31,33 +31,64 @@ class Driskell_Daemon_Model_Config
     }
 
     /**
-     * Get the active default job
+     * Get the active job for a job type
      *
-     * @return int
+     * @param string $jobType
+     * @return int|null
      */
-    public function getActiveDefaultJob()
+    public function getActiveJob($jobType)
     {
-        return Mage::app()->getStore()->getConfig(self::XML_PATH_ACTIVE_DEFAULT_JOB);
+        $this->validateJobType($jobType);
+        // Load directly from database to bypass local config cache
+        $config = Mage::getResourceModel('core/config_data_collection')
+            ->addFieldToFilter('scope', array('eq' => 'default'))
+            ->addFieldToFilter('scope_id', array('eq' => 0))
+            ->addFieldToFilter('path', array('eq' => self::XML_PATH_PREFIX_ACTIVE_JOB . $jobType))
+            ->getFirstItem();
+        $scheduleId = $config ? $config->getValue() : '';
+        if ((string)$scheduleId === '') {
+            return null;
+        }
+        return intval($scheduleId);
     }
 
     /**
-     * Set the active default job
+     * Set the active job for a job type
      *
+     * @param string $jobType
      * @param int $scheduleId
      * @return void
      */
-    public function setActiveDefaultJob($scheduleId)
+    public function setActiveJob($jobType, $scheduleId)
     {
-        Mage::app()->getStore()->setConfig(self::XML_PATH_ACTIVE_DEFAULT_JOB, $scheduleId);
+        $this->validateJobType($jobType);
+        Mage::app()->getConfig()->saveConfig(self::XML_PATH_PREFIX_ACTIVE_JOB . $jobType, $scheduleId, 'default', 0);
     }
 
     /**
-     * Clear the active default job
+     * Clear the active job for a job type
      *
+     * @param string $jobType
      * @return void
      */
-    public function clearActiveDefaultJob()
+    public function clearActiveJob($jobType)
     {
-        $this->setActiveDefaultJob(null);
+        $this->setActiveJob($jobType, '');
+    }
+
+    /**
+     * Validate job type is valid
+     * Throws RuntimeException if it's not valid
+     * Otherwise, returns normally
+     *
+     * @param string $jobType
+     * @throws RuntimeException
+     * @return void
+     */
+    private function validateJobType($jobType)
+    {
+        if (!in_array($jobType, array('default', 'always'))) {
+            throw new RuntimeException('Invalid job type');
+        }
     }
 }

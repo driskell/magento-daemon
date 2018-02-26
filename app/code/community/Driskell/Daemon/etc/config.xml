@@ -26,7 +26,10 @@
     </global>
     <default>
         <driskell_daemon>
-            <active_default_job></active_default_job>
+            <active_job>
+                <default></default>
+                <always></always>
+            </active_job>
             <general>
                 <parallel_jobs></parallel_jobs>
             </general>

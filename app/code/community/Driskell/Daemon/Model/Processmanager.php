@@ -410,28 +410,32 @@ class Driskell_Daemon_Model_ProcessManager
      */
     protected function handleSigChld()
     {
-        $status = null;
-        $pid = pcntl_wait($status, WNOHANG);
-        if ($pid <= 0) {
-            return;
-        }
+        // Process all pending child statuses
+        // (SIGCHLD might only trigger once for multiple)
+        while (true) {
+            $status = null;
+            $pid = pcntl_waitpid(-1, $status, WNOHANG);
+            if ($pid <= 0) {
+                return;
+            }
 
-        if (!isset($this->children[$pid])) {
-            return;
-        }
+            if (!isset($this->children[$pid])) {
+                continue;
+            }
 
-        if (!pcntl_wifexited($status)) {
-            return;
-        }
+            if (!pcntl_wifexited($status)) {
+                continue;
+            }
 
-        $name = $this->children[$pid]['name'];
-        if (isset($this->children[$pid]['callback'])) {
-            call_user_func_array(
-                $this->children[$pid]['callback'],
-                array($name, $pid, $status)
-            );
+            $name = $this->children[$pid]['name'];
+            if (isset($this->children[$pid]['callback'])) {
+                call_user_func_array(
+                    $this->children[$pid]['callback'],
+                    array($name, $pid, $status)
+                );
+            }
+            unset($this->childrenByName[$name]);
+            unset($this->children[$pid]);
         }
-        unset($this->childrenByName[$name]);
-        unset($this->children[$pid]);
     }
 }
