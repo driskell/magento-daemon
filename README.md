@@ -4,13 +4,17 @@
 
 Observable job processing for Magento 1 that replaces Magento cron.
 
+![Output of `service driskell-daemon restart`](intro.jpg)
+
 ## Overview
 
-The usual Magento 1 way to run background jobs is via the Magento cron. This has always been a crude way of running jobs in the background. There are many drawbacks, the major one being any failure of a job is undetectable. Furthermore, knowing if a job is still running from the Magento Admin, even with extensions such as Aoe Scheduler, is not reliable. In fact, such schedulers can begin to mark long running jobs as completed when they haven't.
+The usual Magento 1 way to run background jobs is via the Magento cron. This has always been a crude way of running jobs in the background. There are many drawbacks, the major one being any failure of a job is undetectable. Furthermore, knowing if a job is still running from the Magento Admin, even with extensions such as Aoe Scheduler, is not reliable. In fact, such schedulers can begin to mark long running jobs as completed or failed when they haven't.
 
-Daemon provides a first-class system service wrapper for running Magento jobs. It runs permanently in the background, with a supervisor to ensure it restarts on failure, monitoring all running jobs in realtime. As jobs complete the Magento database is updated so extensions that expose schedule activity are entirely accurate at all times. All child processes are also labelled with their running job codes in the system process listing to provide realtime observability of what each running process is doing.
+Daemon provides a system service wrapper for running Magento jobs. It runs permanently in the background as the same user as Magento, with its own supervisor to ensure it can recover from failure (database restarts etc.), monitoring all running jobs in realtime. As jobs complete the Magento database is updated so extensions that expose schedule activity are entirely accurate at all times. In the process list child processes are also labelled with their running job codes to provide realtime observability of what is currently running.
 
-Daemon also provides the ability to mark certain jobs as parallel jobs, that will run independently of all other jobs (which are run serially), thereby allowing long-running complex background jobs to run without impeding the recurrency of critical background jobs.
+Each job is also given a "Blackbox" (its own `error_log` target) to capture every error that occurs whilst running that job, so it can be recorded to the database. This captures not only warnings but notices and... fatal errors! With a little work these could eventually be monitored and messages raised in Magento Admin to the right users when things aren't behaving.
+
+Finally, Daemon also provides the ability to mark certain jobs as parallel jobs, that will run independently of all other jobs, thereby allowing long-running background jobs to run without causing any delays to other jobs.
 
 ## Installation
 
@@ -45,6 +49,8 @@ If you encounter any issues and need to revert to the default cron, all you need
 ## Monitoring
 
 Running `service driskell-daemon status` or `systemctl status driskell-daemon` will return a nice output along with a process tree showing you exactly what is currently running.
+
+![Output of `service driskell-daemon status`](screenshot1.jpg)
 
 Name | Purpose
 --- | ---
