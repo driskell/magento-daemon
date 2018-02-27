@@ -4,7 +4,7 @@ For RedHat 7, CentOS 7 and other similar systems.
 
 To install the SystemD service wrapper, copy the `systemd.service` file to `/etc/systemd/system/driskell-daemon.service` and run `systemctl daemon-reload`.
 
-Then, to configure the user and group you will need, run `systemd edit driskell-daemon`, and enter the following.
+Then, to configure the user and group you will need, run `systemctl edit driskell-daemon`, and enter the following.
 
 ```
 [Service]
