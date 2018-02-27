@@ -31,11 +31,26 @@ class Driskell_Daemon_Model_Supervisor
     private $state = self::SUPERVISOR_INIT;
 
     /**
+     * Temp data directory for daemon to save logs etc. to
+     *
+     * @var string
+     */
+    private $varDir;
+
+    /**
+     * Lock file resource
+     *
+     * @var resource|null
+     */
+    private $lockFile;
+
+    /**
      * Constructor
      */
     public function __construct()
     {
         $this->processManager = new Driskell_Daemon_Model_Processmanager();
+        $this->varDir = Mage::app()->getConfig()->getVarDir('daemon');
     }
 
     /**
@@ -46,7 +61,12 @@ class Driskell_Daemon_Model_Supervisor
      */
     public function run()
     {
+        // TODO: Fork and communicate successfull startup
+
         $this->processManager->setProcessTitle('driskell-daemon [supervisor]');
+
+        // Prevent multiple instances
+        $this->takeLock();
 
         // Become a session leader so we can monitor session via:
         //    ps fj -s <sessionId>
@@ -68,6 +88,8 @@ class Driskell_Daemon_Model_Supervisor
         }
 
         $this->processManager->terminateChildren();
+
+        $this->releaseLock();
     }
 
     /**
@@ -141,5 +163,49 @@ class Driskell_Daemon_Model_Supervisor
             return false;
         }
         return true;
+    }
+
+    /**
+     * Prevent multiple supervisors
+     *
+     * @return void
+     */
+    private function takeLock()
+    {
+        if ($this->lockFile) {
+            return;
+        }
+
+        if (!file_exists($this->varDir)) {
+            mkdir($this->varDir, 0777, true);
+        }
+
+        $lockPath = $this->varDir . DS . 'supervisor.lock';
+
+        $this->lockFile = fopen($lockPath, 'c+');
+        if ($this->lockFile === false) {
+            throw new Exception('Failed to open the lock file');
+        }
+
+        $res = flock($this->lockFile, LOCK_EX | LOCK_NB);
+        if ($res === false) {
+            throw new Exception('Another process is already running');
+        }
+
+        // Write our PID to help diagnose lock issues
+        $myPid = getmypid();
+        fwrite($this->lockFile, $myPid);
+        fflush($this->lockFile);
+        ftruncate($this->lockFile, strlen($myPid));
+    }
+
+    /**
+     * Release lock
+     *
+     * @return void
+     */
+    private function releaseLock()
+    {
+        fclose($this->lockFile);
     }
 }
