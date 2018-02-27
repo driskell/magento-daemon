@@ -63,6 +63,7 @@ class Driskell_Daemon_Model_Dispatcher extends Mage_Cron_Model_Observer
         }
 
         $this->cleanBlackBox();
+        $this->cleanRunning();
 
         // Prevent collection caching so we can reload the schedule reliably
         Mage::app()->getCacheInstance()->banUse('collections');
@@ -387,6 +388,23 @@ class Driskell_Daemon_Model_Dispatcher extends Mage_Cron_Model_Observer
     private function resetPendingSchedules()
     {
         $this->_pendingSchedules = null;
+    }
+
+    /**
+     * Clean running jobs
+     *
+     * @return void
+     */
+    private function cleanRunning()
+    {
+        $runningSchedule = Mage::getModel('cron/schedule')->getCollection()
+            ->addFieldToFilter('status', Mage_Cron_Model_Schedule::STATUS_RUNNING);
+        foreach ($runningSchedule as $schedule) {
+            $schedule
+                ->setStatus(Mage_Cron_Model_Schedule::STATUS_ERROR)
+                ->setMessages(Mage::helper('cron')->__('Orphaned with unknown status'))
+                ->save();
+        }
     }
 
     /**
